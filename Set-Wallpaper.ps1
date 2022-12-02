@@ -7,58 +7,13 @@ param([string]$Source="APOD")
 # pwsh.exe -WindowStyle Hidden -File "Set-WallpaperFromUnsplash.ps1"
 
 # https://stackoverflow.com/questions/39011252/powershell-image-drawstring-centering-string-with-left-and-right-padding
-[void][reflection.assembly]::loadwithpartialname("system.windows.forms")
 
-Function AddTextToImage {
-    [CmdletBinding()]
-    PARAM (
-        [Parameter(Mandatory=$true)][String] $ImagePath,
-        [Parameter(Mandatory=$true)][String] $Title,
-        [Parameter()][String] $Description = $null
-    )
+[void][Reflection.Assembly]::LoadWithPartialName("System.Drawing")
+[void][reflection.assembly]::loadwithpartialname("System.Windows.Forms")
 
-    [Reflection.Assembly]::LoadWithPartialName("System.Drawing") | Out-Null
-    $srcImg = [System.Drawing.Image]::FromFile($ImagePath)
-    $outputIImg = new-object System.Drawing.Bitmap([int]($srcImg.width)),([int]($srcImg.height))
-    $Image = [System.Drawing.Graphics]::FromImage($outputIImg)
-    $Rectangle = New-Object Drawing.Rectangle 0, 0, $srcImg.Width, $srcImg.Height
-    $Image.DrawImage($srcImg, $Rectangle, 0, 0, $srcImg.Width, $srcImg.Height, ([Drawing.GraphicsUnit]::Pixel))
+$wallpaperDownloadPath = "$($env:TEMP)`\wallpaperdownload.jpg"
 
-    # Title
-    $TitleFont = new-object System.Drawing.Font("Verdana", 18, "Bold","Pixel")
-    $title_font_size = [System.Windows.Forms.TextRenderer]::MeasureText($Title, $TitleFont)
-#    $title_font_sizewidth = $title_font_size.Width
-#    $title_font_sizeheight = $title_font_size.Height
-
-    $titlerect = [System.Drawing.RectangleF]::FromLTRB(0, 0, $srcImg.Width, $srcImg.Height)
-    $format = [System.Drawing.StringFormat]::GenericDefault
-    $format.Alignment = [System.Drawing.StringAlignment]::Near
-    $format.LineAlignment = [System.Drawing.StringAlignment]::Near
-
-    # Description
-    $DescFont = new-object System.Drawing.Font("Verdana", 12, "Regular","Pixel")
-    # $desc_font_size = [System.Windows.Forms.TextRenderer]::MeasureText($Description, $DescFont)
-    # $desc_font_sizewidth = $desc_font_size.Width
-    # $desc_font_sizeheight = $desc_font_size.Height
-    $descrect = [System.Drawing.RectangleF]::FromLTRB(0, $title_font_size.Height, $srcImg.Width, $srcImg.Height)
-
-    $srcImg.Dispose()
-    
-    #styling font
-    $Brush = New-Object Drawing.SolidBrush([System.Drawing.Color]::FromArgb(255, 255, 255, 255))
-
-    #lets draw font
-    $Image.DrawString($Title, $TitleFont, $Brush, $titlerect, $format)
-    #lets draw font
-    $Image.DrawString($Description, $DescFont, $Brush, $descrect, $format)
-
-
-    Write-Verbose "Save and close the files"
-    $outputIImg.save($ImagePath, [System.Drawing.Imaging.ImageFormat]::jpeg)
-    $outputIImg.Dispose()
-    
-}
-Function Set-WallPaper($Image, [string]$Style='Fit') {
+Function Set-WallPaper($Filename, [string]$Style='Fit') {
 
     # Set the style of how the wallpaper should be fitted to the desktop resolution
     $WallpaperStyle = Switch ($Style) { 
@@ -94,7 +49,7 @@ Function Set-WallPaper($Image, [string]$Style='Fit') {
     $updateIni = 0x01
     $fireChangeEvent = 0x02
     $winIniFlags = $updateIni -bor $fireChangeEvent
-    [User32Functions]::SystemParametersInfo($SPI_SETDESKWALLPAPER, 0, $Image, $winIniFlags) | Out-Null
+    [User32Functions]::SystemParametersInfo($SPI_SETDESKWALLPAPER, 0, $Filename, $winIniFlags) | Out-Null
 }
 
 
@@ -132,21 +87,99 @@ if ($Source -eq "UNSPLASH") {
     $explanation = ($json | ConvertFrom-Json | Select-Object explanation).explanation
     $title = ($json | ConvertFrom-Json | Select-Object title).title
 
-    Invoke-WebRequest $url -OutFile "$($env:TEMP)`\wallpaper.jpg"
+    Invoke-WebRequest $url -OutFile $wallpaperDownloadPath
     $title | Out-File "$($env:TEMP)`\wallpapertitle.txt"
     $explanation | Out-File "$($env:TEMP)`\wallpaperdescription.txt"
 }
 
+Function AddTextToImage {
+    param(
+        [String] $inpath,
+        [String] $outpath,
+        [String] $Title,
+        [String] $Description = $null
+    )
+
+    [Reflection.Assembly]::LoadWithPartialName("System.Drawing") | Out-Null
+    $inImg = [System.Drawing.Image]::FromFile($inpath)
+    $outImg = new-object System.Drawing.Bitmap([int]($inImg.width)),([int]($inImg.height))
+    $Image = [System.Drawing.Graphics]::FromImage($outImg)
+    $Rectangle = New-Object Drawing.Rectangle 0, 0, $inImg.Width, $inImg.Height
+    $Image.DrawImage($inImg, $Rectangle, 0, 0, $inImg.Width, $inImg.Height, ([Drawing.GraphicsUnit]::Pixel))
+
+    # Title
+    $TitleFont = new-object System.Drawing.Font("Verdana", 18, "Bold","Pixel")
+    $title_font_size = [System.Windows.Forms.TextRenderer]::MeasureText($Title, $TitleFont)
+
+    $titlerect = [System.Drawing.RectangleF]::FromLTRB(0, 0, $inImg.Width, $inImg.Height)
+    $format = [System.Drawing.StringFormat]::GenericDefault
+    $format.Alignment = [System.Drawing.StringAlignment]::Near
+    $format.LineAlignment = [System.Drawing.StringAlignment]::Near
+
+    # Description
+    $DescFont = new-object System.Drawing.Font("Verdana", 12, "Regular","Pixel")
+    $descrect = [System.Drawing.RectangleF]::FromLTRB(0, $title_font_size.Height, $inImg.Width, $inImg.Height)
+
+    $inImg.Dispose()
+    
+    #styling font
+    $Brush = New-Object Drawing.SolidBrush([System.Drawing.Color]::FromArgb(255, 255, 255, 255))
+    $Image.DrawString($Title, $TitleFont, $Brush, $titlerect, $format)
+    $Image.DrawString($Description, $DescFont, $Brush, $descrect, $format)
+
+    $outImg.save($outpath, [System.Drawing.Imaging.ImageFormat]::jpeg)
+    $outImg.Dispose()
+}
+
+Function ResizeImage() {
+    param([String]$ImagePath, [String]$OutputLocation)
+
+    
+    [Int]$Quality = 90
+    $img = [System.Drawing.Image]::FromFile($ImagePath)
+
+    #Encoder parameter for image quality
+    $ImageEncoder = [System.Drawing.Imaging.Encoder]::Quality
+    $encoderParams = New-Object System.Drawing.Imaging.EncoderParameters(1)
+    $encoderParams.Param[0] = New-Object System.Drawing.Imaging.EncoderParameter($ImageEncoder, $Quality)
+
+    # get codec
+    $Codec = [System.Drawing.Imaging.ImageCodecInfo]::GetImageEncoders() | Where-Object {$_.MimeType -eq 'image/jpeg'}
+
+    #compute the final ratio to use
+    $screenHeight = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea.Height    
+    $Percent = [double]($screenHeight / $img.Height)
+    $newWidth = [int] (([double]$img.Width) * $Percent)
+    $newHeight = [int] (([double]$img.Height) * $Percent)
+
+
+    $bmpResized = New-Object System.Drawing.Bitmap($newWidth, $newHeight)
+    $graph = [System.Drawing.Graphics]::FromImage($bmpResized)
+    $graph.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+
+    $graph.Clear([System.Drawing.Color]::White)
+    $graph.DrawImage($img, 0, 0, $newWidth, $newHeight)
+
+    #save to file
+    $bmpResized.Save($OutputLocation, $Codec, $($encoderParams))
+    $bmpResized.Dispose()
+    $img.Dispose()
+}
+
+
+$resizedPath = "$($env:TEMP)`\wallpaper-resized.jpg"
+$finalPath = "$($env:TEMP)`\wallpaper.jpg"
+
 $Collections = "437035,3652377,8362253"
-
-
 $Source = $Source.ToUpper()
 
 $title = Get-Content "$($env:TEMP)`\wallpapertitle.txt"
 $desc = Get-Content "$($env:TEMP)`\wallpaperdescription.txt"
 
-AddTextToImage -ImagePath "$($env:TEMP)`\wallpaper.jpg" -Title $title -Description $desc
+ResizeImage $wallpaperDownloadPath $resizedPath
+AddTextToImage $resizedPath $finalPath $title $desc
+
 
 $Style = 'Fit'
-Set-WallPaper "$($env:TEMP)/wallpaper.jpg" $Style
+Set-WallPaper $finalPath $Style
 
