@@ -1,4 +1,4 @@
-param([string]$Source="APOD")
+param([string]$Source="BING")
 
 # Get the developer access key by registering for a developer account at Unsplash https://unsplash.com/join
 # Supply developer access key when prompted to cache in encrypted file
@@ -54,6 +54,7 @@ Function Set-WallPaper($Filename, [string]$Style='Fit') {
 
 
 if ($Source -eq "UNSPLASH") {
+    $Collections = "437035,3652377,8362253"
     $creds = (Get-CredentialFromFile.ps1 -File "$($env:USERPROFILE)/Documents/Unsplash.cr")
     $accessKey = $creds.GetNetworkCredential().password
     
@@ -90,6 +91,11 @@ if ($Source -eq "UNSPLASH") {
     Invoke-WebRequest $url -OutFile $wallpaperDownloadPath
     $title | Out-File "$($env:TEMP)`\wallpapertitle.txt"
     $explanation | Out-File "$($env:TEMP)`\wallpaperdescription.txt"
+} elseif ($Source -eq "BING") {
+    $json = (curl "https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=1&mkt=en-US" | ConvertFrom-Json)
+    Invoke-WebRequest "https://bing.com$($json.images.url)" -OutFile $wallpaperDownloadPath
+    $json.images.title | Out-File "$($env:TEMP)`\wallpapertitle.txt"
+    $json.images.copyright | Out-File "$($env:TEMP)`\wallpaperdescription.txt"
 }
 
 Function AddTextToImage {
@@ -170,7 +176,7 @@ Function ResizeImage() {
 $resizedPath = "$($env:TEMP)`\wallpaper-resized.jpg"
 $finalPath = "$($env:TEMP)`\wallpaper.jpg"
 
-$Collections = "437035,3652377,8362253"
+
 $Source = $Source.ToUpper()
 
 $title = Get-Content "$($env:TEMP)`\wallpapertitle.txt"
