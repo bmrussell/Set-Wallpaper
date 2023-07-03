@@ -1,4 +1,4 @@
-param([string]$Source="BING")
+param([string]$Source="APOD")
 
 # Get the developer access key by registering for a developer account at Unsplash https://unsplash.com/join
 # Supply developer access key when prompted to cache in encrypted file
@@ -12,6 +12,11 @@ param([string]$Source="BING")
 [void][reflection.assembly]::loadwithpartialname("System.Windows.Forms")
 
 $wallpaperDownloadPath = "$($env:TEMP)`\wallpaperdownload.jpg"
+
+$apodApiKey = 'DEMO_KEY'
+if ($Env:APOD_API_KEY -ne '') {
+    $apodApiKey = $Env:APOD_API_KEY
+}
 
 Function Set-WallPaper($Filename, [string]$Style='Fit') {
 
@@ -54,7 +59,6 @@ Function Set-WallPaper($Filename, [string]$Style='Fit') {
 
 
 if ($Source -eq "UNSPLASH") {
-    $Collections = "437035,3652377,8362253"
     $creds = (Get-CredentialFromFile.ps1 -File "$($env:USERPROFILE)/Documents/Unsplash.cr")
     $accessKey = $creds.GetNetworkCredential().password
     
@@ -69,14 +73,15 @@ if ($Source -eq "UNSPLASH") {
     $screenWidth = [System.Windows.Forms.Screen]::AllScreens[0].Bounds.Width
 
     # Get image
-    Invoke-WebRequest $content.urls.raw -Headers $headers -Body @{ fm = "jpg"; w = "$($screenWidth)"; q = "80" } -OutFile "$($env:TEMP)/wallpaper.jpg"
+    Invoke-WebRequest $content.urls.raw -Headers $headers -Body @{ fm = "jpg"; w = "$($screenWidth)"; q = "80" } -OutFile $wallpaperDownloadPath
     # and description
     $sel = $content | Select-Object   @{n = "Name"; e = { $_.user.name } }, @{n = "Location"; e = { $_.location.title } }, @{n = "Description"; e = { $_.description } }
     $sel.Name | Out-File "$($env:TEMP)`\wallpapertitle.txt"
     $sel.Description | Out-File "$($env:TEMP)`\wallpaperdescription.txt"
 
 } elseif ($Source -eq "APOD") {
-    $json = curl 'https://api.nasa.gov/planetary/apod?api_key=DEMO_KEY&hd=True'
+    # See https://api.nasa.gov/
+    $json = curl "https://api.nasa.gov/planetary/apod?api_key=$($apodApiKey)&hd=True"
     $url = ($json | ConvertFrom-Json | Select-Object hdurl).hdurl
     if ($null -eq $url) {
         $url = ($json | ConvertFrom-Json | Select-Object url).url
@@ -176,7 +181,7 @@ Function ResizeImage() {
 $resizedPath = "$($env:TEMP)`\wallpaper-resized.jpg"
 $finalPath = "$($env:TEMP)`\wallpaper.jpg"
 
-
+$Collections = "437035,3652377,8362253"
 $Source = $Source.ToUpper()
 
 $title = Get-Content "$($env:TEMP)`\wallpapertitle.txt"
