@@ -1,4 +1,4 @@
-param([string]$Source="APOD")
+param([string]$Source="APOD", [switch]$Get)
 
 # Get the developer access key by registering for a developer account at Unsplash https://unsplash.com/join
 # Supply developer access key when prompted to cache in encrypted file
@@ -157,22 +157,32 @@ Function ResizeImage() {
     # get codec
     $Codec = [System.Drawing.Imaging.ImageCodecInfo]::GetImageEncoders() | Where-Object {$_.MimeType -eq 'image/jpeg'}
 
-    #compute the final ratio to use
-    $screenHeight = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea.Height    
-    $Percent = [double]($screenHeight / $img.Height)
+    # Work out the size of the image so it fits vertically 
+    # between top of the screen and the taskbar
+    $screenWorkingHeight = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea.Height        
+    $screenWidth = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds.Width
+    $screenHeight = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds.Height
+    $Percent = [double]($screenWorkingHeight / $img.Height)
     $newWidth = [int] (([double]$img.Width) * $Percent)
     $newHeight = [int] (([double]$img.Height) * $Percent)
 
-
-    $bmpResized = New-Object System.Drawing.Bitmap($newWidth, $newHeight)
+    # Create a black background the size of the screen
+    # This avoids a rather nasty Windows 11 bug with virtual desktop change :
+    #   if the image dimensions aren't full screen the wallpaper will pop in full width and squashed
+    #   before being reszed by the Windows "Fit" to desktop
+    $bmpResized = New-Object System.Drawing.Bitmap($screenWidth, $screenHeight)
     $graph = [System.Drawing.Graphics]::FromImage($bmpResized)
     $graph.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+    $graph.Clear([System.Drawing.Color]::Black)
 
-    $graph.Clear([System.Drawing.Color]::White)
-    $graph.DrawImage($img, 0, 0, $newWidth, $newHeight)
+    # Draw the resized image centred to fit screen height
+    $offset = ($screenWidth - $newWidth) / 2
+    $graph.DrawImage($img, $offset, 0, $newWidth, $newHeight)
 
     #save to file
     $bmpResized.Save($OutputLocation, $Codec, $($encoderParams))
+
+    # Clean Up
     $bmpResized.Dispose()
     $img.Dispose()
 }
@@ -189,8 +199,9 @@ $desc = Get-Content "$($env:TEMP)`\wallpaperdescription.txt"
 
 ResizeImage $wallpaperDownloadPath $resizedPath
 AddTextToImage $resizedPath $finalPath $title $desc
-
+Remove-Item -Path $resizedPath
 
 $Style = 'Fit'
-Set-WallPaper $finalPath $Style
-
+if (-not $Get.IsPresent) {
+    Set-WallPaper $finalPath $Style
+}
