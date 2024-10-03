@@ -1,4 +1,4 @@
-param([string]$Source="UNSPLASH", [switch]$Get)
+param([string]$Source="APOD", [switch]$Get, [string]$Style='Fit')
 if ($null -eq (Get-Module -ListAvailable -Name CredentialManager)) {
     Install-Module -Name CredentialManager -Scope CurrentUser
 }
@@ -113,6 +113,7 @@ if ($Source -eq "UNSPLASH") {
     Invoke-WebRequest $url -OutFile $wallpaperDownloadPath
     $title = ($content.batchrsp.items[0].item | ConvertFrom-Json).ad.iconHoverText
     $explanation = ($content.batchrsp.items[0].item | ConvertFrom-Json).ad.description
+    $explanation = $explanation.Replace('???', '`n')
     
     $newlinepos = $title.IndexOf("`n")
     if ($newlinepos -ne -1) {
@@ -222,7 +223,6 @@ ResizeImage $wallpaperDownloadPath $resizedPath
 AddTextToImage $resizedPath $finalPath $title $desc
 Remove-Item -Path $resizedPath
 
-$Style = 'Fit'
 if (-not $Get.IsPresent) {
     Set-WallPaper $finalPath $Style
 }
