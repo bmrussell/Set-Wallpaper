@@ -1,4 +1,8 @@
-param([string]$Source="APOD", [switch]$Get)
+param([string]$Source="UNSPLASH", [switch]$Get)
+if ($null -eq (Get-Module -ListAvailable -Name CredentialManager)) {
+    Install-Module -Name CredentialManager -Scope CurrentUser
+}
+Import-Module -Name CredentialManager
 
 # Get the developer access key by registering for a developer account at Unsplash https://unsplash.com/join
 # Supply developer access key when prompted to cache in encrypted file
@@ -59,8 +63,8 @@ Function Set-WallPaper($Filename, [string]$Style='Fit') {
 
 
 if ($Source -eq "UNSPLASH") {
-    $creds = (Get-CredentialFromFile.ps1 -File "$($env:USERPROFILE)/Documents/Unsplash.cr")
-    $accessKey = $creds.GetNetworkCredential().password
+    
+    $accessKey = Get-StoredCredential -AsCredentialObject -Target "unsplash" | Select-Object -ExpandProperty Password
     
     $baseUrl = "https://api.unsplash.com"
     $randomPhotoUrl = "$($baseUrl)/photos/random"
@@ -101,6 +105,22 @@ if ($Source -eq "UNSPLASH") {
     Invoke-WebRequest "https://bing.com$($json.images.url)" -OutFile $wallpaperDownloadPath
     $json.images.title | Out-File "$($env:TEMP)`\wallpapertitle.txt"
     $json.images.copyright | Out-File "$($env:TEMP)`\wallpaperdescription.txt"
+} elseif ($Source -eq "SPOTLIGHT") {
+    $spotlighturl = "https://fd.api.iris.microsoft.com/v4/api/selection?&placement=88000820&bcnt=4&country=GB&locale=en-GB&fmt=json"
+    $content = Invoke-WebRequest $spotlighturl -Method Get -Headers $headers -Body $params | ConvertFrom-Json
+
+    $url = ($content.batchrsp.items[0].item | ConvertFrom-Json).ad.landscapeImage.asset.ToString()
+    Invoke-WebRequest $url -OutFile $wallpaperDownloadPath
+    $title = ($content.batchrsp.items[0].item | ConvertFrom-Json).ad.iconHoverText
+    $explanation = ($content.batchrsp.items[0].item | ConvertFrom-Json).ad.description
+    
+    $newlinepos = $title.IndexOf("`n")
+    if ($newlinepos -ne -1) {
+        $title = $title.Substring(0, $newlinepos)
+    }
+    
+    $title | Out-File "$($env:TEMP)`\wallpapertitle.txt"
+    $explanation | Out-File "$($env:TEMP)`\wallpaperdescription.txt"
 }
 
 Function AddTextToImage {

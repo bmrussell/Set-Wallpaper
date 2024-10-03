@@ -25,7 +25,7 @@ Powershell script to set desktop wallpaper from various sources
 ```
 ./Set-Wallpaper.ps1 -Source [Source]
 ```
-Where `Source` is either `BING`, `APOD` or `Unsplash`, not case sensitive.
+Where `Source` is either `SPOTLIGHT`, `BING`, `APOD` or `Unsplash`, not case sensitive.
 
 ### From Task scheduler
 If Set-Wallpaper is on your path, start `pwsh.exe` or `powershell.exe` with an argument of `-Command "Set-Wallpaper.ps1 -Source [Source]"`
