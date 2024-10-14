@@ -143,15 +143,16 @@ Function AddTextToImage {
     # Title
     $TitleFont = new-object System.Drawing.Font("Verdana", 18, "Bold","Pixel")
     $title_font_size = [System.Windows.Forms.TextRenderer]::MeasureText($Title, $TitleFont)
+    $v_offset = $title_font_size.Height
 
-    $titlerect = [System.Drawing.RectangleF]::FromLTRB(0, 0, $textWidth, $inImg.Height)
+    $titlerect = [System.Drawing.RectangleF]::FromLTRB(0, $v_offset, $textWidth, $inImg.Height)
     $format = [System.Drawing.StringFormat]::GenericDefault
     $format.Alignment = [System.Drawing.StringAlignment]::Near
     $format.LineAlignment = [System.Drawing.StringAlignment]::Near
 
     # Description
     $DescFont = new-object System.Drawing.Font("Verdana", 12, "Regular","Pixel")
-    $descrect = [System.Drawing.RectangleF]::FromLTRB(0, $title_font_size.Height, $textWidth, $inImg.Height)
+    $descrect = [System.Drawing.RectangleF]::FromLTRB(0, $title_font_size.Height+$v_offset, $textWidth, $inImg.Height)
 
     $inImg.Dispose()
     
