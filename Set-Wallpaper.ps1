@@ -1,4 +1,4 @@
-param([string]$Source="APOD", [switch]$Get, [string]$Style='Fit')
+param([string]$Source="APOD", [switch]$Get, [string]$Country='GB')
 if ($null -eq (Get-Module -ListAvailable -Name CredentialManager)) {
     Install-Module -Name CredentialManager -Scope CurrentUser
 }
@@ -106,7 +106,7 @@ if ($Source -eq "UNSPLASH") {
     $json.images.title | Out-File "$($env:TEMP)`\wallpapertitle.txt"
     $json.images.copyright | Out-File "$($env:TEMP)`\wallpaperdescription.txt"
 } elseif ($Source -eq "SPOTLIGHT") {
-    $spotlighturl = "https://fd.api.iris.microsoft.com/v4/api/selection?&placement=88000820&bcnt=4&country=GB&locale=en-GB&fmt=json"
+    $spotlighturl = "https://fd.api.iris.microsoft.com/v4/api/selection?&placement=88000820&bcnt=4&country=$Country&locale=en-$Country&fmt=json"
     $content = Invoke-WebRequest $spotlighturl -Method Get -Headers $headers -Body $params | ConvertFrom-Json
 
     $url = ($content.batchrsp.items[0].item | ConvertFrom-Json).ad.landscapeImage.asset.ToString()
@@ -143,16 +143,15 @@ Function AddTextToImage {
     # Title
     $TitleFont = new-object System.Drawing.Font("Verdana", 18, "Bold","Pixel")
     $title_font_size = [System.Windows.Forms.TextRenderer]::MeasureText($Title, $TitleFont)
-    $v_offset = $title_font_size.Height
 
-    $titlerect = [System.Drawing.RectangleF]::FromLTRB(0, $v_offset, $textWidth, $inImg.Height)
+    $titlerect = [System.Drawing.RectangleF]::FromLTRB(0, 0, $textWidth, $inImg.Height)
     $format = [System.Drawing.StringFormat]::GenericDefault
     $format.Alignment = [System.Drawing.StringAlignment]::Near
     $format.LineAlignment = [System.Drawing.StringAlignment]::Near
 
     # Description
     $DescFont = new-object System.Drawing.Font("Verdana", 12, "Regular","Pixel")
-    $descrect = [System.Drawing.RectangleF]::FromLTRB(0, $title_font_size.Height+$v_offset, $textWidth, $inImg.Height)
+    $descrect = [System.Drawing.RectangleF]::FromLTRB(0, $title_font_size.Height, $textWidth, $inImg.Height)
 
     $inImg.Dispose()
     
@@ -163,6 +162,64 @@ Function AddTextToImage {
 
     $outImg.save($outpath, [System.Drawing.Imaging.ImageFormat]::jpeg)
     $outImg.Dispose()
+}
+
+function Resize-And-CropImage {
+    param (
+        [string]$InputFilePath,
+        [string]$OutputFilePath
+    )
+
+    #$screenWorkingHeight = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea.Height        
+    $screenWidth = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds.Width
+    $screenHeight = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds.Height
+
+    # Load the image
+    $image = [System.Drawing.Image]::FromFile($InputFilePath)
+
+    # Determine original dimensions
+    $originalWidth = $image.Width
+    $originalHeight = $image.Height
+
+    # Calculate the scaling factor based on the longest edge
+    $targetLongestEdge = [Math]::Max($screenWidth, $screenHeight)
+    $currentLongestEdge = [Math]::Max($originalWidth, $originalHeight)
+    $scaleFactor = $targetLongestEdge / $currentLongestEdge
+
+    # Calculate new dimensions
+    $newWidth = [Math]::Round($originalWidth * $scaleFactor)
+    $newHeight = [Math]::Round($originalHeight * $scaleFactor)
+
+    # Resize the image
+    $resizedImage = New-Object System.Drawing.Bitmap([int]($newWidth), [int]($newHeight))
+    $graphics = [System.Drawing.Graphics]::FromImage($resizedImage)
+    $graphics.DrawImage($image, 0, 0, $newWidth, $newHeight)
+    $graphics.Dispose()
+
+    # Determine cropping coordinates
+    $cropX = 0
+    $cropY = 0
+    # $cropWidth = $screenWidth
+    # $cropHeight = $screenHeight
+
+    if ($newWidth -gt $screenWidth) {
+        $cropX = ($newWidth - $screenWidth) / 2
+    }
+    elseif ($newHeight -gt $screenHeight) {
+        $cropY = ($newHeight - $screenHeight) / 2
+    }
+
+    # Perform the crop
+    $cropRect = New-Object System.Drawing.Rectangle($cropX, $cropY, $screenWidth, $screenHeight)
+    $croppedImage = $resizedImage.Clone($cropRect, $resizedImage.PixelFormat)
+
+    # Save the result
+    $croppedImage.Save($OutputFilePath, [System.Drawing.Imaging.ImageFormat]::Jpeg)
+
+    # Clean up
+    $image.Dispose()
+    $resizedImage.Dispose()
+    $croppedImage.Dispose()
 }
 
 Function ResizeImage() {
@@ -220,10 +277,13 @@ $Source = $Source.ToUpper()
 $title = Get-Content "$($env:TEMP)`\wallpapertitle.txt"
 $desc = Get-Content "$($env:TEMP)`\wallpaperdescription.txt"
 
-ResizeImage $wallpaperDownloadPath $resizedPath
+Resize-And-CropImage -InputFilePath $wallpaperDownloadPath -OutputFilePath $resizedPath
+
 AddTextToImage $resizedPath $finalPath $title $desc
 Remove-Item -Path $resizedPath
 
 if (-not $Get.IsPresent) {
-    Set-WallPaper $finalPath $Style
+    Set-WallPaper $finalPath 'Fit'
+} else {
+    & $finalPath
 }
